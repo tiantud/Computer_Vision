@@ -11,43 +11,35 @@ using namespace std;
 int main( int argc, char** argv )
 {
     QCoreApplication a(argc, argv);
+    Mat image;
 
-    std::cout << "FK" << "\n";
+    // default image source
+    String imageName( "../data/HappyFish.jpg" );
 
-
-    //! [load]
-    String imageName( "../data/HappyFish.jpg" ); // by default
+    // if image source is selected
     if( argc > 1)
     {
         imageName = argv[1];
     }
-    //! [load]
 
-    //! [mat]
-    Mat image;
-    //! [mat]
+    // Read the file
+    image = imread( imageName, IMREAD_COLOR );
 
-    //! [imread]
-    image = imread( imageName, IMREAD_COLOR ); // Read the file
-    //! [imread]
-
-    if( image.empty() )                      // Check for invalid input
+    // Check for invalid input
+    if( image.empty() )
     {
         cout <<  "Could not open or find the image" << std::endl ;
         return -1;
     }
 
-    //! [window]
-    namedWindow( "Display window", WINDOW_AUTOSIZE ); // Create a window for display.
-    //! [window]
+    // Create a window for display.
+    namedWindow( "Display window", WINDOW_AUTOSIZE );
 
-    //! [imshow]
-    imshow( "Display window", image );                // Show our image inside it.
-    //! [imshow]
+    // Show our image inside it.
+    imshow( "Display window", image );
 
-    //! [wait]
-    waitKey(0); // Wait for a keystroke in the window
-    //! [wait]
+    // Wait for a keystroke in the window
+    waitKey(0);
     return a.exec();
 }
 
