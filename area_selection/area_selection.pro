@@ -1,7 +1,7 @@
 QT += core
 QT -= gui
 
-TARGET = Solarisation
+TARGET = area_selection
 CONFIG += console
 CONFIG -= app_bundle
 
