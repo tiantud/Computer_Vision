@@ -39,6 +39,10 @@ void help()
     "./image Image [image-name Default: fruits.jpg]\n" << endl;
 }
 
+float polyFunction(float a, float b ,float c, float x0, float x){
+    return a * pow((x-x0), 3) - b * x + c;
+}  // claculate result of solarisation with selected polynom
+
 void on_mouse( int event, int x, int y, int flags, void* param )
 {
     switch( event )
@@ -52,7 +56,6 @@ void on_mouse( int event, int x, int y, int flags, void* param )
                SrcPtInt[nb_points].y=y;
                if (nb_points)
                {
-                  cout << "In the 1.st situation" << endl;
                   // second point in SrcPtInt
 
                   MapCurveimage512 = 0;
@@ -66,43 +69,42 @@ void on_mouse( int event, int x, int y, int flags, void* param )
 
                   // determine polynomial coefficients of y(x):=a*(x-x0)^3-b*x+c
                   float x0,a,b,c,k;
-                  x0 = (float)0.5 * abs(x1+x2);
-                  k = (float)0.75 * pow(x1-x2, 2);
-                  a = (y1 - y2) / (pow(x1 - x0, 3)-pow(x2-x0, 3) - k * (x1 - x2));
+                  x0 = 0.5 * abs(x1+x2);
+                  k = 0.75 * pow(x1-x2, 2);
+                  a = (y1 - y2) / (pow(x1-x0, 3)-pow(x2-x0, 3) - k * (x1 - x2));
                   b = k * a;
-                  c = y1 - a * (pow(x1 - x0, 3) - k * x1);
-
-                  // output parameters for test
-
-                  cout << "Shoud print my positions now!" << endl;
-                  cout<<"First point:" << x1 << "," << y1 << endl;
-                  cout<<"Second point:" << x2 << "," << y2 << endl;
-                  cout<<"x0::" << x0 << endl;
-                  cout<<"a:" << a << endl;
-                  cout<<"b:" << b << endl;
-                  cout<<"c:" << c << endl;
-                  cout<< endl;
-                  cout<< endl;
+                  c = y1 - a * (pow(x1-x0, 3) - k * x1);
 
                   // create the LUT for that polynom and
                   // draw the polynom in the MapCurveimage (pixelwise)
-                  // your code for the polynomial and color transform (instead of the following line)
-//                  line(MapCurveimage512, SrcPtInt[0], SrcPtInt[1], CV_RGB(255, 255, 255));	// remove that line example
                   int x,y;
-                  Vec3b color = (255,255,255);
 
-
-                  for(x = 0;x <= 511;x++){
-                      y = a * pow((x-x0), 3) - b * x + c;
-                      y = 511 - y;
+                  for(x = 0;x <= MapCurveimage512.cols;x++){
+                      y = polyFunction(a, b, c, x0, x);
+                      y = MapCurveimage512.cols - y;
                       if(y >= 0 && y <= 512){
-                          MapCurveimage512.at<Vec3b>(Point(x/3,y)) = color;
-                          cout<<"x,y:"<<x/3<<","<<y<<endl;
+                          MapCurveimage512.at<Vec3b>(y,x)[0] = 255;
+                          MapCurveimage512.at<Vec3b>(y,x)[1] = 255;
+                          MapCurveimage512.at<Vec3b>(y,x)[2] = 255;
                       }
                   }
 
                   // use the lookup table (LUT) to map the input image to the result image
                   // use the same LUT for each color channel (or fantasize)
+
+                  mapped_result_img = image.clone();
+
+                  for(int col=0; col<mapped_result_img.cols; col++){
+                      // iterator of all columns
+                      for(int row=0; row<mapped_result_img.rows; row++){
+                          // iterator of all pixels
+
+                          mapped_result_img.at<Vec3b>(row,col)[0] = polyFunction(a, b, c, x0, mapped_result_img.at<Vec3b>(row,col)[0]);
+                          mapped_result_img.at<Vec3b>(row,col)[1] = polyFunction(a, b, c, x0, mapped_result_img.at<Vec3b>(row,col)[1]);
+                          mapped_result_img.at<Vec3b>(row,col)[2] = polyFunction(a, b, c, x0, mapped_result_img.at<Vec3b>(row,col)[2]);
+
+                      }
+                  }
 
                   // show non-linear mapping curve
                   imshow("GreyCurve", MapCurveimage512);
@@ -114,7 +116,6 @@ void on_mouse( int event, int x, int y, int flags, void* param )
                   nb_points = 0;
                } else {
                    nb_points++;
-                   cout << "In the 2.st situation" << endl;
                }
                }
         }
@@ -122,12 +123,9 @@ void on_mouse( int event, int x, int y, int flags, void* param )
     }
 }  // void on_mouse( int event, int x, int y, int flags, void* param )
 
-
 int main( int argc, char** argv )
 {
     help();
-
-    cout << "hello!" << endl;
 
     char* filename = argc == 3 ? argv[1] : (char*)"../data/fruits.jpg";
     image = imread(filename, 1);
@@ -137,7 +135,7 @@ int main( int argc, char** argv )
     namedWindow( "Fruits!");
     imshow( "Fruits!", mapped_result_img );
 
-    MapCurveimage512.create(512, 512, CV_8U);
+    MapCurveimage512.create(512, 512, CV_8UC3);
     MapCurveimage512 = 0;
     imshow("GreyCurve", MapCurveimage512);
 
