@@ -1,5 +1,5 @@
 # Computer Vision
-This is my exercises of lecture Computer Vision in TU Dresden.
+This is my exercises of lecture Computer Vision.
 
 To test these program:
 	
