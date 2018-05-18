@@ -1,74 +1,109 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
+#include <opencv/cv.hpp>
 #include <QCoreApplication>
+#include <math.h>
 #include <iostream>
 #include <string>
+
+#define _USE_MATH_DEFINES
 
 using namespace cv;
 using namespace std;
 
-int matMult(Mat vec, int multType)
-{
-    return 0;
+int getGrad(int y, int x){
+    int result;
+
+    if(y == 0 && x == 0){
+        result = 500;
+    } else if (x == 0) {
+        result = 90;
+    } else {
+        result = atan((float)y/(float)x) * 180 / M_PI;
+    }
+
+    return result;
 }
 
 int main(int argc, char *argv[])
 {
+    Mat image, vertiGradientImage, horizGradientImage, gradientImage;
 
-    Mat image, vertiGradient, gradient;
-    char* filename = argc == 3 ? argv[1] : (char*)"./images/lines1.png";
+    // overall filter
+    Mat overallMask=(Mat_<char>(3,3)<<  0,  1,  0,
+                                       -1,  0,  1,
+                                        0, -1,  0);
+
+    Mat blu=(Mat_<char>(3,3)<<          1,  2,  1,
+                                        2,  4,  2,
+                                        1,  2,  1);
+
+    // horizonal filter
+    Mat horizMask=(Mat_<char>(1,3)<< -1,  0,  1);
+
+    // vertical filter
+    Mat vertiMask=(Mat_<char>(3,1)<<  1,
+                                      0,
+                                     -1);
+    // result histalgram
+    Mat gradientHisto(400,540,CV_8UC1, Scalar(0));
+
+    // list of data in histalgram: 0-179 grad
+    int histoList[180];
+    std::fill_n(histoList, 180, 0); /// fill with default value
+
+    // read image
+//    char* filename = argc == 3 ? argv[1] : (char*)"./images/keyb7.jpg";
+//    char* filename = argc == 3 ? argv[1] : (char*)"./images/lines1.png";
+    char* filename = argc == 3 ? argv[1] : (char*)"./images/lines2.png";
     image = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
 
-    vertiGradient.create(image.rows, image.cols, 4);
-    gradient.create(image.rows, image.cols, 4);
+    // blur image for better result
+    filter2D (image,image,CV_32F,blu);
 
-    cout<< "image information:"<< endl;
-    cout<< "   rols: "<< image.rows<< endl;
-    cout<< "   cols: "<< image.cols<< endl;
+    // calculate histal and vertical gradient
+    filter2D (image,vertiGradientImage,CV_32F,vertiMask);
 
-    namedWindow( "Origional image", WINDOW_AUTOSIZE);
-    imshow( "Origional image", image );
+    filter2D (image,horizGradientImage,CV_32F,horizMask);
 
-    Mat row, rowVector, horizGradient;
-    horizGradient.create(image.rows, image.cols, 4);
+    // calculate overall gradient
+    filter2D (image,gradientImage,CV_32F,overallMask);
 
-    // create a 1x3 vector for each vector multiplication.
-    rowVector.create(1,3,4);
-
-    for(int i = 0; i < image.rows; i++)
+    // calculate data in the gradient-mount list
+    int grad, max = 0;
+    for(int row = 0; row < image.rows; row++)
     {
-        // for each rows in image do:
-        row = image.row(i);
-        for(int j = 0; j < image.cols; j++)
+        for(int col = 0; col < image.cols; col++)
         {
-            // for each pixel in this row do:
+            grad = getGrad((int)vertiGradientImage.at<float>(Point(col,row)), (int)horizGradientImage.at<float>(Point(col,row)));
 
-
-            // outer pixel will be filled with nearest inside pixel
-            // which means edges like: 0 0 0 51 60 ....
-            // horizonal gradient of edge 51 will be 60-51
-            if(j == 0)
+            if(grad < 400)
             {
-                rowVector.at<int>(0,0) = row.at<int>(j);
-            } else {
-                rowVector.at<int>(0,0) = row.at<int>(j-1);
+                histoList[grad + 89] += 1;
             }
 
-            rowVector.at<int>(0,1) = row.at<int>(j);
-
-            // otherside of edge
-            if(j == image.cols - 1)
+            if(histoList[grad + 89] > max)
             {
-                rowVector.at<int>(0,2) = row.at<int>(j);
-            } else {
-                rowVector.at<int>(0,2) = row.at<int>(j+1);
+                max = histoList[grad + 89];
             }
-
-            // vector multiplication
-            horizGradient.at<int> (i, j)= matMult(rowVector, 0);
         }
     }
+
+    // draw histaldiagram with list of data
+    for(int col = 0; col < gradientHisto.cols; col++){
+        int h = histoList[col/3] * (gradientHisto.rows-1) / max;
+        line( gradientHisto, Point(col, gradientHisto.rows-1) ,
+                             Point(col, gradientHisto.rows-1 - h),
+                               Scalar( 255, 0, 0), 1, 8, 0  );
+    }
+
+    // show images
+    imshow("vertiGradientImage",vertiGradientImage);
+    imshow("horizGradientImage",horizGradientImage);
+    imshow("gradientImage",gradientImage);
+    imshow("gradientHisto",gradientHisto);
+
 
     waitKey(0);
     return 0;
