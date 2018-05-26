@@ -76,18 +76,15 @@ Point2f rotation_from(Point2f center, Point2f new_position, int angle){
     // get origional position
     Mat ori_position = after_rot * rotation_matrix;
 
-//    cout<< "rotation from x: " << ori_position.at<float>(0,0) + center.x << "| y: " << ori_position.at<float>(0,1) + center.y << endl;
-//    cout<< "to x: " << new_position.x << "| y: " << new_position.y << endl;
-//    cout<< endl;
-
     // return ori_position(col, row)
     return Point2f(ori_position.at<float>(0,0) + center.x, ori_position.at<float>(0,1) + center.y);
 }
 
 void rotation(Mat src, Mat dst, Point2f center, int rot_angle){
 
-    // initialize result position
+    // initialize
     Point2f ori_pos(0,0);
+    Mat around_matrix, x_matrix, y_matrix, resout;
 
     // for each pixel in result image do:
     for(int col = 0; col < dst.cols; col++)
@@ -106,30 +103,36 @@ void rotation(Mat src, Mat dst, Point2f center, int rot_angle){
                 pos_rb = src.at<uchar>(Point2f((int)ori_pos.x + 1, (int)ori_pos.y + 1));
 
 
+
+
+
                 // matrix of related pixel
-                Mat around_matrix = (Mat_<float>(2,2)<<  pos_lb,  pos_lt,
-                                                         pos_rb,  pos_rt);
+                around_matrix = (Mat_<float>(2,2)<<  pos_lb,  pos_lt,
+                                                     pos_rb,  pos_rt);
 
 
                 // vectors in derection x
-                Mat x_matrix = (Mat_<float>(1,2)<<  ((int)ori_pos.x + 1) - ori_pos.x,
-                                                               ori_pos.x - (int)ori_pos.x);
+                x_matrix = (Mat_<float>(1,2)<<  ((int)ori_pos.x + 1) - ori_pos.x,
+                                                           ori_pos.x - (int)ori_pos.x);
 
                 // vectors in derection y
-                Mat y_matrix = (Mat_<float>(2,1)<<  ((int)ori_pos.y + 1) - ori_pos.y,
-                                                               ori_pos.y - (int)ori_pos.y);
+                y_matrix = (Mat_<float>(2,1)<<             ori_pos.y - (int)ori_pos.y,
+                                                ((int)ori_pos.y + 1) - ori_pos.y);
 
                 // bilinear interpolation algo (wikipedia)
-                Mat resout = x_matrix * around_matrix * y_matrix;
+                resout = x_matrix * around_matrix * y_matrix;
 
                 // set result into result image
                 dst.at<uchar>(Point2f( col, row )) = resout.at<float>(0, 0);
+
             } else {
                 // for pixel from outside of origional image
                 dst.at<uchar>(Point2f( col, row )) = 0;
             }
         }
     }
+    imwrite( "./images/result.jpg", dst );
+//    GaussianBlur(dst, dst, Size(3,3), 0.5,0.5);
 }
 
 
@@ -333,7 +336,7 @@ int main( int argc, char** argv )
       line(funcImg, CurvePoint_1, CurvePoint_2, CV_RGB(255, 255, 255));  // lines between each point
       CurvePoint_1 = CurvePoint_2;
    }
-//   imshow("Sinc !", funcImg);
+   imshow("Sinc !", funcImg);
 
    // show si
    Normalize_function_plot(&si_values, 20, 220);
@@ -348,9 +351,9 @@ int main( int argc, char** argv )
       line(SiImg, CurvePoint_1, CurvePoint_2, CV_RGB(255, 255, 255));  // lines between each point
       CurvePoint_1 = CurvePoint_2;
    }
-//   imshow("Si !", SiImg);
+   imshow("Si !", SiImg);
 
-   filename = argc == 3 ? argv[1] : (char*)"./images/img1.jpg";
+   filename = argc == 3 ? argv[1] : (char*)"./images/img2.jpg";
    image = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
 
 //   imshow("origional image",image);
