@@ -24,6 +24,153 @@
 using namespace cv;
 using namespace std;
 
+//-------------------------------------------------------------------
+// init
+
+const int slider_value_max = 360;                      // max angle for slider
+int slider_value;                                      // current value from slider
+char* filename;
+Mat image_ori, image, image_with_center, rot_90;
+int rot_center_x, rot_center_y;                        // rotation center
+float pos_lt, pos_lb, pos_rt, pos_rb;                  // bilinear interpolation
+
+//-------------------------------------------------------------------
+// helper function to draw rotation center
+// to display the center of rotation visually
+void drawFilledCircle(cv::Mat img, cv::Point center){
+    int thickness = -1;
+    int lineType = 8;
+    int radius = 3;
+
+    cv::circle(img,
+               center,
+               radius,
+               cv::Scalar(0,0,255),
+               thickness,
+               lineType);
+}
+
+//-------------------------------------------------------------------
+// rotation
+
+Point2f rotation_from(Point2f center, Point2f new_position, int angle){
+
+    // angle from destination to the position before
+    angle = (-1) * angle;
+
+    // vector from center to destination
+    float diff_x = new_position.x - center.x;
+    float diff_y = new_position.y - center.y;
+
+    // destination matrix
+    Mat after_rot=(Mat_<float>(1,3)<<   diff_x,  diff_y,  1.0 );
+
+    float si = sin( angle * CV_PI / 180 );
+    float co = cos( angle * CV_PI / 180 );
+
+    // rotation matrix
+    Mat rotation_matrix = (Mat_<float>(3,3)<<  co, -si,   0,
+                                               si,  co,   0,
+                                                0,   0,   1);
+
+    // get origional position
+    Mat ori_position = after_rot * rotation_matrix;
+
+//    cout<< "rotation from x: " << ori_position.at<float>(0,0) + center.x << "| y: " << ori_position.at<float>(0,1) + center.y << endl;
+//    cout<< "to x: " << new_position.x << "| y: " << new_position.y << endl;
+//    cout<< endl;
+
+    // return ori_position(col, row)
+    return Point2f(ori_position.at<float>(0,0) + center.x, ori_position.at<float>(0,1) + center.y);
+}
+
+void rotation(Mat src, Mat dst, Point2f center, int rot_angle){
+
+    // initialize result position
+    Point2f ori_pos(0,0);
+
+    // for each pixel in result image do:
+    for(int col = 0; col < dst.cols; col++)
+    {
+        for(int row = 0; row < dst.rows; row++)
+        {
+            // get the responce pixel from input image
+            ori_pos = rotation_from( center, Point2f( col, row ), rot_angle);
+
+            if((int)ori_pos.x < 512 && (int)ori_pos.x >= 0 && (int)ori_pos.y >= 0 && (int)ori_pos.y < 512)
+            {
+                // related pixel
+                pos_lt = src.at<uchar>(Point2f((int)ori_pos.x, (int)ori_pos.y));
+                pos_lb = src.at<uchar>(Point2f((int)ori_pos.x, (int)ori_pos.y + 1));
+                pos_rt = src.at<uchar>(Point2f((int)ori_pos.x + 1, (int)ori_pos.y));
+                pos_rb = src.at<uchar>(Point2f((int)ori_pos.x + 1, (int)ori_pos.y + 1));
+
+
+                // matrix of related pixel
+                Mat around_matrix = (Mat_<float>(2,2)<<  pos_lb,  pos_lt,
+                                                         pos_rb,  pos_rt);
+
+
+                // vectors in derection x
+                Mat x_matrix = (Mat_<float>(1,2)<<  ((int)ori_pos.x + 1) - ori_pos.x,
+                                                               ori_pos.x - (int)ori_pos.x);
+
+                // vectors in derection y
+                Mat y_matrix = (Mat_<float>(2,1)<<  ((int)ori_pos.y + 1) - ori_pos.y,
+                                                               ori_pos.y - (int)ori_pos.y);
+
+                // bilinear interpolation algo (wikipedia)
+                Mat resout = x_matrix * around_matrix * y_matrix;
+
+                // set result into result image
+                dst.at<uchar>(Point2f( col, row )) = resout.at<float>(0, 0);
+            } else {
+                // for pixel from outside of origional image
+                dst.at<uchar>(Point2f( col, row )) = 0;
+            }
+        }
+    }
+}
+
+
+
+//-------------------------------------------------------------------
+// trackbars
+
+void angle_trackbar( int, void* )
+{
+    Point2f src_center(rot_center_x, rot_center_y);
+    Mat rot_mat = getRotationMatrix2D(src_center, slider_value, 1.0);
+    warpAffine(image_with_center, image, rot_mat, image_with_center.size());
+
+//    rotation(image_with_center, image, src_center, slider_value);
+
+    imshow("image",image);
+}
+
+void center_x_trackbar( int, void* )
+{
+    image_with_center = image_ori.clone();
+
+    setTrackbarPos("rotation angle", "image", 0 );
+
+    Point2f src_center(rot_center_x, rot_center_y);
+    drawFilledCircle(image_with_center, src_center);
+
+    imshow("image",image_with_center);
+}
+
+void center_y_trackbar( int, void* )
+{
+    image_with_center = image_ori.clone();
+
+    setTrackbarPos("rotation angle", "image", 0 );
+
+    Point2f src_center(rot_center_x, rot_center_y);
+    drawFilledCircle(image_with_center, src_center);
+
+    imshow("image",image_with_center);
+}
 
 //-------------------------------------------------------------------
 // helper function that produces visible images from out of 0..255 range images
@@ -142,7 +289,6 @@ void help()
       "// and sampled according to the sampling theorem\n";
 }
 
-
 int main( int argc, char** argv )
 {
     help();
@@ -187,7 +333,7 @@ int main( int argc, char** argv )
       line(funcImg, CurvePoint_1, CurvePoint_2, CV_RGB(255, 255, 255));  // lines between each point
       CurvePoint_1 = CurvePoint_2;
    }
-   imshow("Sinc !", funcImg);
+//   imshow("Sinc !", funcImg);
 
    // show si
    Normalize_function_plot(&si_values, 20, 220);
@@ -202,13 +348,34 @@ int main( int argc, char** argv )
       line(SiImg, CurvePoint_1, CurvePoint_2, CV_RGB(255, 255, 255));  // lines between each point
       CurvePoint_1 = CurvePoint_2;
    }
-   imshow("Si !", SiImg);
+//   imshow("Si !", SiImg);
 
-   char* filename = argc == 3 ? argv[1] : (char*)"./images/badass2.jpg";
-   Mat image;
+   filename = argc == 3 ? argv[1] : (char*)"./images/img1.jpg";
    image = imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
 
-   imshow("badass",image);
+//   imshow("origional image",image);
+
+   image_ori = image.clone();
+   image_with_center = image.clone();
+   rot_90 = image.clone();
+
+   rot_center_x = image_ori.cols/2.0F;
+   rot_center_y = image_ori.rows/2.0F;
+
+   Point2f src_center(rot_center_x, rot_center_y);
+   drawFilledCircle(image_with_center, src_center);
+
+   imshow("image",image_with_center);
+
+   createTrackbar("rotation angle", "image", &slider_value, slider_value_max, angle_trackbar );
+
+   createTrackbar("rotation center x", "image", &rot_center_x, image_ori.cols, center_x_trackbar );
+
+   createTrackbar("rotation center y", "image", &rot_center_y, image_ori.rows, center_y_trackbar );
+
+   rotation(image_with_center, rot_90, src_center, 85);
+
+   imshow("90 rotation",rot_90);
 
    waitKey();
 
